@@ -3,21 +3,31 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
+import { OAuth2Client } from "google-auth-library";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret";
 
-// Register (with optional photo)
+const JWT_SECRET = process.env.JWT_SECRET;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+
+const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
+
+/* =========================
+   REGISTER (LOCAL)
+========================= */
 router.post("/register", upload.single("photo"), async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password)
+    if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields required" });
+    }
 
     const exists = await User.findOne({ email });
-    if (exists) return res.status(400).json({ message: "Email already exists" });
+    if (exists) {
+      return res.status(400).json({ message: "Email already exists" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -29,26 +39,36 @@ router.post("/register", upload.single("photo"), async (req, res) => {
       provider: "local",
     });
 
-    res.status(201).json({ message: "User registered successfully", user: newUser });
+    res.status(201).json({
+      message: "User registered successfully",
+      user: newUser,
+    });
   } catch (err) {
     console.error("REGISTER ERROR:", err);
     res.status(500).json({ message: "Registration failed" });
   }
 });
 
-// Login
+/* =========================
+   LOGIN (LOCAL)
+========================= */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user || !user.password)
+    if (!user || !user.password) {
       return res.status(400).json({ message: "Invalid credentials" });
+    }
 
     const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) return res.status(400).json({ message: "Invalid credentials" });
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
 
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: "1d" });
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+      expiresIn: "1d",
+    });
 
     res.json({ token });
   } catch (err) {
@@ -57,11 +77,55 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Get current user
+/* =========================
+   GOOGLE LOGIN (CORRECT)
+========================= */
+router.post("/google-login", async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "No Google credential" });
+    }
+
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID,
+    });
+
+    const { email, name, picture, sub } = ticket.getPayload();
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        photo: picture,
+        provider: "google",
+        googleId: sub,
+      });
+    }
+
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+      expiresIn: "1d",
+    });
+
+    res.json({ token });
+  } catch (err) {
+    console.error("GOOGLE LOGIN ERROR:", err);
+    res.status(401).json({ message: "Google authentication failed" });
+  }
+});
+
+/* =========================
+   GET CURRENT USER
+========================= */
 router.get("/me", async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: "No token provided" });
+    if (!authHeader) {
+      return res.status(401).json({ message: "No token provided" });
+    }
 
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, JWT_SECRET);
