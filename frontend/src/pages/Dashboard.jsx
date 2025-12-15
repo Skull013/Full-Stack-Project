@@ -50,7 +50,7 @@ export default function Dashboard() {
               <img
                 src={
                   user.photo
-                    ? `http://localhost:4000/${user.photo}`
+                    ? `https://full-stack-project-1pi6.onrender.com/${user.photo}`
                     : user.avatar
                 }
                 alt="Profile"

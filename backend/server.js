@@ -1,4 +1,3 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -23,17 +22,15 @@ app.use(
   })
 );
 
-// Test route to ensure server is running
-app.get("/api/ping", (req, res) => {
-  res.json({ message: "Server is alive!" });
-});
+// Test route
+app.get("/api/ping", (req, res) => res.json({ message: "Server is alive!" }));
 
 // Connect to MongoDB
 connectDB()
   .then(() => console.log("MongoDB connected"))
   .catch((err) => {
     console.error("Database connection failed:", err);
-    process.exit(1); // Stop server if DB fails
+    process.exit(1);
   });
 
 // Routes
@@ -45,7 +42,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: "Internal Server Error" });
 });
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on port: ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port: ${PORT}`));

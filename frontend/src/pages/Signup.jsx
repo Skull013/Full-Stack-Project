@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "../utils/axios";
+import axios from "../utils/axios"; // axios instance with baseURL
 import { useNavigate } from "react-router-dom";
 
 export default function Signup() {
@@ -16,10 +16,14 @@ export default function Signup() {
       form.append("password", data.password);
       if (photo) form.append("photo", photo);
 
-      const res = await axios.post("/auth/register", form);
-      if (res.data.message === "User Registered") navigate("/login");
+      const res = await axios.post("/auth/register", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      alert(res.data.message);
+      navigate("/login");
     } catch (err) {
-      alert("Registration failed");
+      alert(err.response?.data?.message || "Registration failed");
     }
   };
 
@@ -33,12 +37,8 @@ export default function Signup() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-md p-6">
-        
-        <h2 className="text-2xl font-semibold text-center mb-6">
-          Create Account
-        </h2>
+        <h2 className="text-2xl font-semibold text-center mb-6">Create Account</h2>
 
-        
         <div className="flex justify-center mb-4">
           <label className="cursor-pointer">
             <img
@@ -46,12 +46,7 @@ export default function Signup() {
               alt="Profile"
               className="w-24 h-24 rounded-full object-cover border"
             />
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handlePhotoChange}
-            />
+            <input type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
           </label>
         </div>
 
@@ -86,10 +81,7 @@ export default function Signup() {
 
         <p className="text-center text-sm mt-4">
           Already have an account?{" "}
-          <span
-            onClick={() => navigate("/login")}
-            className="text-indigo-600 cursor-pointer font-medium"
-          >
+          <span onClick={() => navigate("/login")} className="text-indigo-600 cursor-pointer font-medium">
             Login
           </span>
         </p>
