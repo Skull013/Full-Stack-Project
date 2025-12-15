@@ -9,6 +9,8 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
 
 app.use(
@@ -18,8 +20,11 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Handle preflight requests
+app.options("*", cors({
+  origin: "https://full-stack-project-fawn.vercel.app",
+  credentials: true,
+}));
 
 connectDB();
 
