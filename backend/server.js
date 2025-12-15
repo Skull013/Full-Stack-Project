@@ -13,7 +13,7 @@ app.use("/uploads", express.static("uploads"));
 
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: "https://full-stack-project-fawn.vercel.app",
     credentials: true,
   })
 );
