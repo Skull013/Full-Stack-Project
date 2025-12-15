@@ -17,29 +17,28 @@ app.use("/uploads", express.static("uploads"));
 // CORS
 app.use(
   cors({
-    origin: "https://full-stack-project-fawn.vercel.app", // frontend URL
+    origin: "https://full-stack-project-fawn.vercel.app",
     credentials: true,
   })
 );
 
 // Test route
-app.get("/api/ping", (req, res) => res.json({ message: "Server is alive!" }));
+app.get("/api/ping", (req, res) => {
+  res.json({ message: "Server is alive!" });
+});
 
-// Connect to MongoDB
+// DB
 connectDB()
   .then(() => console.log("MongoDB connected"))
   .catch((err) => {
-    console.error("Database connection failed:", err);
+    console.error(err);
     process.exit(1);
   });
 
 // Routes
 app.use("/api/auth", authRoutes);
 
-// Global error handler
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Internal Server Error" });
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
-
-app.listen(PORT, () => console.log(`Server running on port: ${PORT}`));

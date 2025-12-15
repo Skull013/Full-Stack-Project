@@ -1,37 +1,32 @@
 import express from "express";
-import User from "../models/User.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import { OAuth2Client } from "google-auth-library";
+import User from "../models/User.js";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
-
-/* =========================
+/* ======================
    REGISTER (LOCAL)
-========================= */
+====================== */
 router.post("/register", upload.single("photo"), async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password)
       return res.status(400).json({ message: "All fields required" });
-    }
 
     const exists = await User.findOne({ email });
-    if (exists) {
+    if (exists)
       return res.status(400).json({ message: "Email already exists" });
-    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await User.create({
+    const user = await User.create({
       name,
       email,
       password: hashedPassword,
@@ -39,60 +34,55 @@ router.post("/register", upload.single("photo"), async (req, res) => {
       provider: "local",
     });
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user: newUser,
-    });
+    res.status(201).json({ message: "Registered", user });
   } catch (err) {
-    console.error("REGISTER ERROR:", err);
     res.status(500).json({ message: "Registration failed" });
   }
 });
 
-/* =========================
+/* ======================
    LOGIN (LOCAL)
-========================= */
+====================== */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user || !user.password) {
+    if (!user || !user.password)
       return res.status(400).json({ message: "Invalid credentials" });
-    }
 
-    const isValid = await bcrypt.compare(password, user.password);
-    if (!isValid) {
+    const match = await bcrypt.compare(password, user.password);
+    if (!match)
       return res.status(400).json({ message: "Invalid credentials" });
-    }
 
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
-      expiresIn: "1d",
-    });
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
     res.json({ token });
   } catch (err) {
-    console.error("LOGIN ERROR:", err);
     res.status(500).json({ message: "Login failed" });
   }
 });
 
-/* =========================
+/* ======================
    GOOGLE LOGIN (CORRECT)
-========================= */
+====================== */
 router.post("/google-login", async (req, res) => {
   try {
     const { credential } = req.body;
-    if (!credential) {
-      return res.status(400).json({ message: "No Google credential" });
-    }
 
-    const ticket = await googleClient.verifyIdToken({
+    if (!credential)
+      return res.status(400).json({ message: "No credential" });
+
+    const ticket = await client.verifyIdToken({
       idToken: credential,
-      audience: GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const { email, name, picture, sub } = ticket.getPayload();
+    const { email, name, picture } = ticket.getPayload();
 
     let user = await User.findOne({ email });
 
@@ -102,42 +92,40 @@ router.post("/google-login", async (req, res) => {
         email,
         photo: picture,
         provider: "google",
-        googleId: sub,
       });
     }
 
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, {
-      expiresIn: "1d",
-    });
+    const token = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-    res.json({ token });
+    res.json({ token, user });
   } catch (err) {
-    console.error("GOOGLE LOGIN ERROR:", err);
-    res.status(401).json({ message: "Google authentication failed" });
+    console.error(err);
+    res.status(500).json({ message: "Google login failed" });
   }
 });
 
-/* =========================
-   GET CURRENT USER
-========================= */
+/* ======================
+   CURRENT USER
+====================== */
 router.get("/me", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ message: "No token provided" });
-    }
+    const auth = req.headers.authorization;
+    if (!auth) return res.status(401).json({ message: "No token" });
 
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const token = auth.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     const user = await User.findById(decoded.id).select(
       "name email photo provider"
     );
 
     res.json(user);
-  } catch (err) {
-    console.error("ME ERROR:", err);
-    res.status(401).json({ message: "Invalid or expired token" });
+  } catch {
+    res.status(401).json({ message: "Invalid token" });
   }
 });
 
